@@ -110,6 +110,42 @@ fn title_route_rule_routes_matching_secondary_window() {
 }
 
 #[test]
+fn all_windows_route_rule_routes_secondary_windows() {
+    let existing = window(10);
+    let created = window(11);
+    let mut backend = FakeBackend {
+        observation: Some(observation_for_windows(
+            "com.example.Test",
+            &created,
+            &[(existing.clone(), frame(50)), (created.clone(), frame(100))],
+        )),
+        ..FakeBackend::default()
+    };
+    backend.frames.insert(existing.clone(), frame(50));
+    backend.frames.insert(created.clone(), frame(100));
+    let config = Config::parse(
+        "version = 1\n[[rules]]\nbundle_id = 'com.example.Test'\naction = 'route'\nworkspace = 6\nwindows = 'all'",
+    )
+    .unwrap();
+    let mut runtime = runtime_with_config(backend, config);
+    // The app already owns a tile on workspace 1, so a first-window rule would
+    // leave the new window there.
+    bind(&mut runtime, WorkspaceId::ONE, &existing);
+
+    runtime.cycle(outputs(), &AtomicBool::new(false)).unwrap();
+
+    assert_eq!(
+        runtime.workspaces.workspace_of(&existing),
+        Some(WorkspaceId::ONE)
+    );
+    assert_eq!(
+        runtime.workspaces.workspace_of(&created),
+        Some(WorkspaceId::SIX)
+    );
+    assert!(runtime.backend.frames[&created].x >= 1000);
+}
+
+#[test]
 fn floating_rule_converts_existing_and_new_windows_to_floating_ownership() {
     let existing = window(10);
     let created = window(11);

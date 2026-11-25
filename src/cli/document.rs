@@ -388,6 +388,8 @@ pub(crate) struct RuleDoc {
     pub action: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace: Option<WorkspaceId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub windows: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -432,6 +434,8 @@ pub(crate) struct RuleView {
     pub action: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workspace: Option<WorkspaceId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub windows: Option<String>,
 }
 
 impl RuleView {
@@ -443,6 +447,7 @@ impl RuleView {
             title_contains: rule.title_contains.clone(),
             action: rule.action.clone(),
             workspace: rule.workspace,
+            windows: rule.windows.clone(),
         }
     }
 }
@@ -620,6 +625,9 @@ pub(crate) fn format_rule_summary(rule: &RuleDoc) -> String {
         matchers.push(format!("title_contains={part:?}"));
     }
     let target = match (rule.action.as_str(), rule.workspace) {
+        ("route", Some(workspace)) if rule.windows.as_deref() == Some("all") => {
+            format!("workspace {workspace} (all windows)")
+        }
         ("route", Some(workspace)) => format!("workspace {workspace}"),
         (action, _) => action.to_owned(),
     };

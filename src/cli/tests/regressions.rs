@@ -516,6 +516,42 @@ fn rules_add_writes_pin_and_title_contains_rules_and_lists_them_back() {
 }
 
 #[test]
+fn rules_add_all_windows_writes_and_keeps_the_windows_field() {
+    let temp = TempConfig::new("rules-all-windows");
+
+    let routed = temp.run(&[
+        "rules",
+        "add",
+        "--app",
+        "com.google.Chrome",
+        "--workspace",
+        "4",
+        "--all-windows",
+    ]);
+    assert_eq!(routed.exit_code, 0);
+    assert_eq!(
+        routed.stdout.as_deref(),
+        Some("added rule 1: bundle_id=com.google.Chrome -> workspace 4 (all windows)")
+    );
+    // A second CLI write rewrites the document and must keep the field.
+    let pinned = temp.run(&["rules", "add", "--app", "com.apple.Stickies", "--pin"]);
+    assert_eq!(pinned.exit_code, 0);
+    let source = temp.read();
+    assert!(source.contains("windows = \"all\""), "{source}");
+    assert!(
+        Config::parse(&source)
+            .unwrap()
+            .routes_every_window("com.google.Chrome", &sample_window(None))
+    );
+    let listed = temp.run(&["rules", "list", "--json"]);
+    let json: Value = serde_json::from_str(listed.stdout.as_deref().unwrap()).unwrap();
+    assert_eq!(json["rules"][0]["windows"], "all");
+
+    let floated = temp.run(&["rules", "add", "--app", "x", "--float", "--all-windows"]);
+    assert_ne!(floated.exit_code, 0);
+}
+
+#[test]
 fn config_gets_sets_shows_and_resets_trackpad_swipe() {
     let temp = TempConfig::new("config-trackpad-swipe");
     temp.write("version = 1\n");

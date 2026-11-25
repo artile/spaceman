@@ -78,6 +78,14 @@ bundle_id = "com.tinyspeck.slackmacgap"
 action = "route"
 workspace = 2
 
+# A route rule moves only an application's first window unless it says
+# windows = "all": then every new window goes to the routed workspace.
+[[rules]]
+bundle_id = "com.google.Chrome"
+action = "route"
+workspace = 4
+windows = "all"
+
 # Named workspaces A-Z are opt-in. Configuring one registers Option+letter to
 # switch and Option+Shift+letter to move the focused window there.
 [[rules]]

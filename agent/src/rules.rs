@@ -742,6 +742,8 @@ fn set_place(table: &mut dyn TableLike, place: Place) {
             };
             set_table_item(table, "action", value(action));
             table.remove("workspace");
+            // Only a route rule can say which windows it routes.
+            table.remove("windows");
         }
     }
 }

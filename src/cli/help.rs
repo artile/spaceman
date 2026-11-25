@@ -206,7 +206,8 @@ pub(crate) fn rules_help(executable: &str) -> String {
         &format!(
             "  {executable} rules add --app <bundle-id> (--workspace <ws> | --float | --pin | --tile | --ignore)"
         ),
-        "                         [--title <title> | --title-contains <text>] [--position <index>] [--json]",
+        "                         [--title <title> | --title-contains <text>] [--all-windows]",
+        "                         [--position <index>] [--json]",
         &format!("  {executable} rules remove <index-or-bundle-id> [--json]"),
         &format!("  {executable} rules remove --app <bundle-id> [--json]"),
         "",
@@ -215,6 +216,7 @@ pub(crate) fn rules_help(executable: &str) -> String {
         "  --title <title>            Require an exact window title match",
         "  --title-contains <text>    Require the window title to contain <text>, ignoring case",
         "  --workspace <ws>           Route matching windows to workspace 1-10 or A-Z",
+        "  --all-windows              With --workspace: route every new window, not only the app's first",
         "  --float                    Float matching windows without tiling",
         "  --pin                      Float matching windows and show them on every workspace",
         "  --tile                     Tile matching windows even if they look like dialogs",

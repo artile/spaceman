@@ -229,6 +229,9 @@ pub enum WindowDisposition {
 struct WindowRule {
     matcher: WindowMatcher,
     action: WindowDisposition,
+    /// A `route` rule with `windows = "all"`: every new window it matches is routed, not only
+    /// the application's first one.
+    all_windows: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -351,6 +354,7 @@ struct RawWindowRule {
     title_contains: Option<String>,
     action: String,
     workspace: Option<WorkspaceId>,
+    windows: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -396,6 +400,16 @@ impl Config {
                 ("route", None) => return Err("route rule requires workspace".into()),
                 (action, _) => return Err(format!("unknown window rule action {action:?}")),
             };
+            let all_windows = match (rule.windows.as_deref(), action) {
+                (None | Some("first"), _) => false,
+                (Some("all"), WindowDisposition::Route(_)) => true,
+                (Some("all"), _) => return Err("only a route rule can specify windows".into()),
+                (Some(other), _) => {
+                    return Err(format!(
+                        "unknown window rule windows {other:?}; expected \"first\" or \"all\""
+                    ));
+                }
+            };
             rules.push(WindowRule {
                 matcher: WindowMatcher {
                     bundle_id: rule.bundle_id,
@@ -403,6 +417,7 @@ impl Config {
                     title_contains: rule.title_contains.map(|value| value.to_lowercase()),
                 },
                 action,
+                all_windows,
             });
         }
         let mut workspace_monitors = Vec::with_capacity(raw.workspaces.len());
@@ -566,10 +581,13 @@ impl Config {
         rule.over(crate::defaults::patch(bundle_id))
     }
 
+    /// Whether the route rule matching `window` routes it even when its application already has
+    /// windows: a title filter, or `windows = "all"`.
     #[must_use]
-    pub fn route_matches_title(&self, bundle_id: &str, window: &ObservedWindow) -> bool {
+    pub fn routes_every_window(&self, bundle_id: &str, window: &ObservedWindow) -> bool {
         self.matching_rule(bundle_id, window).is_some_and(|rule| {
-            matches!(rule.action, WindowDisposition::Route(_)) && rule.matcher.matches_titles()
+            matches!(rule.action, WindowDisposition::Route(_))
+                && (rule.all_windows || rule.matcher.matches_titles())
         })
     }
 
@@ -897,12 +915,46 @@ workspace = 3
         );
         // A title filter covers only some windows: it is not an app-wide route.
         assert!(!config.has_bundle_route("com.apple.Safari"));
-        assert!(config.route_matches_title("com.apple.Safari", &window(Some("work — notes"))));
+        assert!(config.routes_every_window("com.apple.Safari", &window(Some("work — notes"))));
         assert_eq!(
             Config::parse("version = 1\n[[rules]]\ntitle_contains = ''\naction = 'float'")
                 .err()
                 .as_deref(),
             Some("title_contains cannot be empty")
+        );
+    }
+
+    #[test]
+    fn windows_all_routes_every_window_of_a_route_rule() {
+        let all = Config::parse(
+            "version = 1\n[[rules]]\nbundle_id = 'com.google.Chrome'\naction = 'route'\nworkspace = 4\nwindows = 'all'",
+        )
+        .unwrap();
+        assert!(all.routes_every_window("com.google.Chrome", &window(None)));
+        // Still an app-wide route, so it wins over remembered placements.
+        assert!(all.has_bundle_route("com.google.Chrome"));
+        for first in ["", "\nwindows = 'first'"] {
+            let config = Config::parse(&format!(
+                "version = 1\n[[rules]]\nbundle_id = 'com.google.Chrome'\naction = 'route'\nworkspace = 4{first}"
+            ))
+            .unwrap();
+            assert!(!config.routes_every_window("com.google.Chrome", &window(None)));
+        }
+        assert_eq!(
+            Config::parse(
+                "version = 1\n[[rules]]\nbundle_id = 'x'\naction = 'float'\nwindows = 'all'"
+            )
+            .err()
+            .as_deref(),
+            Some("only a route rule can specify windows")
+        );
+        assert_eq!(
+            Config::parse(
+                "version = 1\n[[rules]]\nbundle_id = 'x'\naction = 'route'\nworkspace = 2\nwindows = 'some'"
+            )
+            .err()
+            .as_deref(),
+            Some("unknown window rule windows \"some\"; expected \"first\" or \"all\"")
         );
     }
 

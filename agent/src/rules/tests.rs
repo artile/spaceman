@@ -123,6 +123,21 @@ fn a_tile_rule_reads_back_and_the_hud_float_replaces_it_in_place() {
 }
 
 #[test]
+fn moving_an_all_windows_route_keeps_the_field_until_it_stops_routing() {
+    let mut doc = Doc::parse(
+        "version = 1\n\n[[rules]]\nbundle_id = \"com.google.Chrome\"\naction = \"route\"\nworkspace = 4\nwindows = \"all\"\n",
+    );
+    assert!(doc.error.is_none());
+    doc.set_app_place("com.google.Chrome", Some(Place::Workspace(ws("2"))));
+    assert!(doc.source().contains("windows = \"all\""));
+    let config = spaceman::config::Config::parse(&doc.source()).unwrap();
+    assert!(config.has_bundle_route("com.google.Chrome"));
+    doc.set_app_place("com.google.Chrome", Some(Place::Float));
+    assert!(!doc.source().contains("windows"));
+    assert!(spaceman::config::Config::parse(&doc.source()).is_ok());
+}
+
+#[test]
 fn set_app_place_updates_bundle_rule_without_touching_title_rules() {
     let mut doc = Doc::parse(SOURCE);
     assert_eq!(doc.app_place("com.brave.Browser"), None);

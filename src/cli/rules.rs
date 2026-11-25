@@ -46,6 +46,7 @@ struct AddOptions {
     title: Option<String>,
     title_contains: Option<String>,
     action: ActionArg,
+    all_windows: bool,
     position: Option<usize>,
     json: bool,
 }
@@ -141,6 +142,7 @@ fn parse_add_options(args: &[&str]) -> Result<AddOptions, String> {
     let mut title_contains: Option<String> = None;
     let mut action: Option<ActionArg> = None;
     let mut position: Option<usize> = None;
+    let mut all_windows = false;
     let mut json = false;
 
     let mut index = 0;
@@ -250,6 +252,12 @@ fn parse_add_options(args: &[&str]) -> Result<AddOptions, String> {
                     })?;
                 position = Some(parsed);
             }
+            "--all-windows" => {
+                if inline_value.is_some() {
+                    return Err("--all-windows does not take a value".into());
+                }
+                all_windows = true;
+            }
             "--json" => {
                 if inline_value.is_some() {
                     return Err("--json does not take a value".into());
@@ -270,12 +278,16 @@ fn parse_add_options(args: &[&str]) -> Result<AddOptions, String> {
                 .into(),
         );
     };
+    if all_windows && !matches!(action, ActionArg::Workspace(_)) {
+        return Err("--all-windows requires --workspace <ws>".into());
+    }
 
     Ok(AddOptions {
         app,
         title,
         title_contains,
         action,
+        all_windows,
         position,
         json,
     })
@@ -297,6 +309,7 @@ fn run_add(args: &[&str], path_override: Option<&Path>) -> Result<String, String
         title_contains: options.title_contains,
         action,
         workspace,
+        windows: options.all_windows.then(|| "all".to_owned()),
     };
 
     let display_index = ConfigDoc::edit_locked(&path, |doc| {
@@ -462,6 +475,7 @@ fn run_remove(args: &[&str], path_override: Option<&Path>) -> Result<String, Str
             title_contains: entry.title_contains.clone(),
             action: entry.action.clone(),
             workspace: entry.workspace,
+            windows: entry.windows.clone(),
         };
         Ok(format!(
             "removed rule {}: {}",

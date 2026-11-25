@@ -427,6 +427,7 @@ on the same letter.
 - Unit (FakeBackend), `src/app/tests/reconciliation.rs`: adoption order
   (`bundle_route_applies_to_initial_window_while_secondary_windows_stay_on_active_workspace`,
   `title_route_rule_routes_matching_secondary_window`,
+  `all_windows_route_rule_routes_secondary_windows`,
   `ignore_rule_releases_the_window_and_never_adopts_it`,
   `floating_rule_owns_window_without_adding_it_to_layout`,
   `new_window_opens_on_active_workspace_even_when_app_has_window_on_inactive_workspace`), display fallback

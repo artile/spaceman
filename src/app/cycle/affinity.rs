@@ -194,7 +194,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                 } else if floating {
                     let routed = patch.home.filter(|target| {
                         (!app_owns_window
-                            || self.config.route_matches_title(&app.bundle_id, window))
+                            || self.config.routes_every_window(&app.bundle_id, window))
                             && self
                                 .scope
                                 .manages_selector(self.workspaces.assignment(*target))
@@ -240,7 +240,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                             target
                         ));
                     }
-                    if !app_owns_tiled || self.config.route_matches_title(&app.bundle_id, window) {
+                    if !app_owns_tiled || self.config.routes_every_window(&app.bundle_id, window) {
                         app_owns_window = true;
                         app_owns_tiled = true;
                         FrozenWindowAffinity::ExplicitRoute(target)

@@ -70,6 +70,12 @@ bundle_id = "ai.opencode.desktop"
 action = "route"
 workspace = "D"                       # named workspace A through Z
 
+[[rules]]
+bundle_id = "com.google.Chrome"
+action = "route"
+workspace = 4
+windows = "all"                       # optional, route only: "first" (default) or "all"
+
 [[workspaces]]
 workspace = 9                         # 1 through 10 or "A" through "Z"; unique
 monitor = "main"                      # non-empty selector
@@ -103,7 +109,9 @@ overrides the default for what it decides: `action = "tile"` tiles one of these 
 - `route` assigns a newly inserted resizable logical window to workspace 1 through 10 or a configured
   named workspace A through Z. A bundle-level `route` rule (without `title` or `title_contains`)
   applies to the application's initial window while secondary windows opened later stay on the
-  active workspace; a title-matched `route` rule routes every matching window. Movable
+  active workspace; a title-matched `route` rule routes every matching window. Add
+  `windows = "all"` to route every new window of the application, for example a browser window
+  another app opens while you work on a different workspace. Movable
   non-resizable windows remain floating on the workspace where first observed. A rule does not
   repeatedly route existing slots, including a Ghostty native-tab physical replacement.
 - `ignore` leaves the window entirely alone: never tiled, never owned by a workspace, never moved or
