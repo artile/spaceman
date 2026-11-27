@@ -28,6 +28,9 @@ def check(case, name, ok, detail):
 for case, pid, start, end, functional in cases:
     start, end = int(start) - epoch, int(end) - epoch
     pids = {int(p) for p in pid.split(",") if p}
+    if functional.startswith("skipped"):
+        check(case, "skipped", None, functional)
+        continue
     check(case, "works", functional.startswith("ok"), functional)
 
     # Time each window of the case spent visible on a display.
@@ -72,11 +75,12 @@ with open(run / "summary.toml", "w") as out:
     for case, name, ok, detail in results:
         # A JSON string is a valid TOML basic string.
         out.write(f"[[check]]\ncase = {json.dumps(case)}\nname = {json.dumps(name)}\n")
-        out.write(f"ok = {str(ok).lower()}\ndetail = {json.dumps(detail)}\n\n")
+        out.write(f"ok = {'\"skipped\"' if ok is None else str(ok).lower()}\ndetail = {json.dumps(detail)}\n\n")
 
 width = max(len(c) for c, *_ in results)
 for case, name, ok, detail in results:
-    print(f"{'PASS' if ok else 'FAIL'}  {case:<{width}}  {name:<15}  {detail}")
-failed = sum(not ok for *_, ok, _ in results)
-print(f"\n{len(results) - failed} passed, {failed} failed  ({run})")
+    print(f"{'SKIP' if ok is None else 'PASS' if ok else 'FAIL'}  {case:<{width}}  {name:<15}  {detail}")
+failed = sum(ok is False for *_, ok, _ in results)
+skipped = sum(ok is None for *_, ok, _ in results)
+print(f"\n{len(results) - failed - skipped} passed, {failed} failed, {skipped} skipped  ({run})")
 sys.exit(1 if failed else 0)
