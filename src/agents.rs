@@ -153,6 +153,8 @@ mod tests {
     #[test]
     fn an_expectation_claims_the_next_process_of_its_bundle_once() {
         let now = crate::config::now().as_millis() as u64;
+        // Keeps the fake pid when a parallel test prunes exited processes.
+        FAKE_LIVE.write().unwrap().insert(9103);
         expect("com.example.Expected").unwrap();
         // A process the user started before the expectation stays theirs.
         assert!(!is_agent_process(

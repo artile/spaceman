@@ -232,3 +232,31 @@ fn an_expected_launch_routes_its_first_window_straight_to_the_agent_workspace() 
     assert!(crate::agents::is_agent(7011));
     assert!(crate::agents::release(7011));
 }
+
+#[test]
+fn an_agent_window_reopened_at_a_parking_spot_goes_to_the_agent_workspace_unseen() {
+    crate::agents::claim_for_test(7012);
+    let parked = main_parked_frame(outputs().main().frame);
+    let reopened = agent_window(7012, 13);
+    let mut backend = FakeBackend {
+        observation: Some(observation_for("com.example.Agent", &reopened, parked)),
+        ..FakeBackend::default()
+    };
+    backend.frames.insert(reopened.clone(), parked);
+    let mut runtime = runtime_with_config(backend, Config::parse(AGENTS).unwrap());
+
+    runtime.cycle(outputs(), &AtomicBool::new(false)).unwrap();
+
+    assert_eq!(runtime.workspaces.workspace_of(&reopened), Some(nine()));
+    let displays = outputs().frames().collect::<Vec<_>>();
+    assert!(
+        !runtime.backend.calls.iter().any(|call| match call {
+            BackendCall::SetPosition(window, frame) | BackendCall::Apply(window, frame) => {
+                *window == reopened && displays.iter().any(|d| d.contains_center(*frame))
+            }
+            _ => false,
+        }),
+        "{:?}",
+        runtime.backend.calls
+    );
+}

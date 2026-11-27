@@ -313,6 +313,19 @@ impl WorkspaceBackend for FakeBackend {
         self.stacking.clone()
     }
 
+    fn bundle_id_of(&mut self, app: &AppInstanceId) -> Option<String> {
+        self.observation
+            .as_ref()?
+            .applications
+            .iter()
+            .find_map(|observed| match observed {
+                crate::AppObservation::Complete { app: observed, .. } if &observed.id == app => {
+                    Some(observed.bundle_id.clone())
+                }
+                _ => None,
+            })
+    }
+
     fn window_owners(&mut self, window_ids: &HashSet<u32>) -> HashMap<u32, AppInstanceId> {
         self.frames
             .keys()

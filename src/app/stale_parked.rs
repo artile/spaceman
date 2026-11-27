@@ -71,12 +71,28 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                 app: app.clone(),
                 window_id: id,
             };
+            // A process that started this cycle has no observation behind it yet.
+            if !self.memory.bundles.contains_key(app)
+                && let Some(bundle_id) = self.backend.bundle_id_of(app)
+            {
+                self.memory.bundles.insert(app.clone(), bundle_id);
+            }
+            let disposition = self.bundle_disposition(&window, frame);
             if self.workspaces.workspace_of_any(&window).is_some()
                 || self.workspaces.scratchpad().contains(&window)
-                || self
-                    .bundle_disposition(&window, frame)
-                    .is_some_and(crate::config::DispositionPatch::is_ignored)
+                || disposition.is_some_and(crate::config::DispositionPatch::is_ignored)
             {
+                continue;
+            }
+            // A window its rule routes to a hidden workspace would be parked there right after
+            // the rescue; rescuing it first flashes it on the user's screen (an agent's app
+            // reopening its window where Spaceman last parked it). It joins that workspace
+            // where it is.
+            if let Some(home) = disposition
+                .and_then(|patch| patch.home)
+                .filter(|home| !self.is_visible(*home, outputs))
+            {
+                self.adopt_parked_unseen(window, home, frame, outputs);
                 continue;
             }
             let offset = cascade.entry((output.x, output.y)).or_insert(0);
@@ -101,5 +117,36 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                 );
             }
         }
+    }
+
+    /// Owns `window` on hidden `workspace` as a parked tile: recovery frame on that workspace's
+    /// display, no move at all.
+    fn adopt_parked_unseen(
+        &mut self,
+        window: crate::PhysicalWindowId,
+        workspace: WorkspaceId,
+        frame: crate::Rect,
+        outputs: &macos::DisplayOutputs,
+    ) {
+        let output = super::runtime::output_for(&self.workspaces, workspace, outputs);
+        let recovery = crate::Rect {
+            x: output.x,
+            y: output.y,
+            ..frame
+        };
+        if !self.record_recovery(&window, recovery) {
+            return;
+        }
+        self.parked.park_applied(&window, self.backend.now());
+        let canvas = self.layout_settings(output).canvas();
+        self.workspaces.adopt_tile(
+            window.clone(),
+            workspace,
+            self.config.layout(),
+            canvas,
+            None,
+        );
+        log_event!("route parked {window:?} -> workspace {workspace} without showing it");
+        self.note_placement(&window, crate::journal::PlacementSource::Rule, workspace);
     }
 }

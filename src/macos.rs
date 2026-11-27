@@ -353,6 +353,16 @@ pub(super) fn running_application(
     })
 }
 
+/// The bundle ID of the running application instance `id`.
+#[must_use]
+pub fn bundle_id_of(id: &AppInstanceId) -> Option<String> {
+    autoreleasepool(|_| {
+        running_application(id)
+            .and_then(|application| application.bundleIdentifier())
+            .map(|bundle_id| bundle_id.to_string())
+    })
+}
+
 pub(super) fn process_incarnation_matches(id: &AppInstanceId) -> bool {
     autoreleasepool(|_| running_application(id).is_some())
 }
