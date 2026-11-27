@@ -7,17 +7,31 @@
 use super::commands::WorkspaceFocusOutcome;
 use super::*;
 
-/// How recent a click must be to explain an activation: a Dock or notification click
-/// activates its app within a few hundred milliseconds.
-const CLICK_WINDOW: f64 = 0.6;
-/// How recent a key chord must be: Command-Tab activates when Command goes up.
+/// How long before an activation a click explains it: a Dock or notification click activates
+/// its app within a few hundred milliseconds, a slow app within a second.
+const CLICK_WINDOW: f64 = 1.0;
+/// A shortcut activates while Command is still down, within this long of its key.
 const CHORD_WINDOW: f64 = 1.0;
+/// Command-Tab (or an Option-Tab switcher) activates when the modifier goes up, however long the
+/// user browsed the switcher before.
+const RELEASE_WINDOW: f64 = 0.5;
+const SWITCHER_BROWSE: f64 = 10.0;
+/// Input a little after the activation notification still caused it (event delivery order).
+const LATE: f64 = 0.25;
 
-/// Whether `input` explains an activation as the user's own.
+/// Whether `input` explains an activation as the user's own. Each input time counts back from
+/// the activation, not from the cycle that reads it: a cycle can run a second later.
 pub(super) fn explicit(input: &macos::RecentInput) -> bool {
-    input.mouse_down < CLICK_WINDOW
-        || (input.key_down < CHORD_WINDOW
-            && (input.command_held || input.modifiers_changed < CHORD_WINDOW))
+    let activated = input.activated.unwrap_or(0.0);
+    let within = |since: f64, window: f64| (-LATE..window).contains(&(since - activated));
+    let click = within(input.mouse_down, CLICK_WINDOW);
+    let chord = input.command_held && within(input.key_down, CHORD_WINDOW);
+    // A switcher's last key (Tab) comes before the modifier goes up; in typing, a letter follows
+    // the Shift release instead.
+    let release = within(input.modifiers_changed, RELEASE_WINDOW)
+        && input.key_down >= input.modifiers_changed - 0.01
+        && within(input.key_down, SWITCHER_BROWSE);
+    click || chord || release
 }
 
 impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
@@ -60,6 +74,14 @@ mod tests {
             mouse_down: click,
             modifiers_changed: modifiers,
             command_held: command,
+            activated: None,
+        }
+    }
+
+    fn at(input: macos::RecentInput, activated: f64) -> macos::RecentInput {
+        macos::RecentInput {
+            activated: Some(activated),
+            ..input
         }
     }
 
@@ -74,6 +96,25 @@ mod tests {
     fn idle_input_and_plain_typing_are_not() {
         assert!(!explicit(&input(9.0, 9.0, 9.0, false)));
         assert!(!explicit(&input(0.2, 3.0, 4.0, false)));
-        assert!(!explicit(&input(3.0, 1.2, 0.1, false)));
+        // Shift let go 0.3 s ago and a letter typed after it.
+        assert!(!explicit(&input(0.05, 3.0, 0.3, false)));
+    }
+
+    #[test]
+    fn command_tab_counts_from_the_activation_however_late_the_cycle_reads_it() {
+        // Logged live: Tab 1.46 s, Command up 1.46 s before the cycle, activation 1.40 s before.
+        assert!(explicit(&at(input(1.46, 12.46, 1.46, false), 1.40)));
+        // The user browsed the switcher for 3 s, then let Command go.
+        assert!(explicit(&at(input(3.2, 30.0, 0.15, false), 0.1)));
+        // A Dock click 1.5 s before the cycle, 0.4 s before the activation.
+        assert!(explicit(&at(input(40.0, 1.53, 70.0, false), 1.13)));
+    }
+
+    #[test]
+    fn input_long_before_the_activation_is_not() {
+        // An agent window raised itself 0.1 s ago; the last keys and clicks were seconds before.
+        assert!(!explicit(&at(input(2.35, 10.35, 2.35, false), 0.1)));
+        // Typing after an agent's activation never explains it.
+        assert!(!explicit(&at(input(0.05, 9.0, 9.0, false), 2.0)));
     }
 }

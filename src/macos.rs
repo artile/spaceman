@@ -1,3 +1,4 @@
+mod activation;
 mod apply;
 mod ax;
 mod classify;
@@ -310,17 +311,21 @@ pub struct RecentInput {
     pub mouse_down: f64,
     pub modifiers_changed: f64,
     pub command_held: bool,
+    /// Seconds since the last application activation; `None` before the first.
+    pub activated: Option<f64>,
 }
 
 impl std::fmt::Display for RecentInput {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "key {:.2}s ago, click {:.2}s ago, modifiers {:.2}s ago, command {}",
+            "key {:.2}s ago, click {:.2}s ago, modifiers {:.2}s ago, command {}, activation {}",
             self.key_down,
             self.mouse_down,
             self.modifiers_changed,
-            if self.command_held { "held" } else { "up" }
+            if self.command_held { "held" } else { "up" },
+            self.activated
+                .map_or_else(|| "unknown".into(), |seconds| format!("{seconds:.2}s ago")),
         )
     }
 }
@@ -334,6 +339,7 @@ pub fn recent_input() -> RecentInput {
         mouse_down: since(CGEventType::LeftMouseDown).min(since(CGEventType::RightMouseDown)),
         modifiers_changed: since(CGEventType::FlagsChanged),
         command_held: CGEventSource::flags_state(state).contains(CGEventFlags::MaskCommand),
+        activated: activation::seconds_since_activation(),
     }
 }
 

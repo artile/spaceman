@@ -234,6 +234,7 @@ fn observe_workspace(
         };
         let activated = Arc::clone(invalidation);
         let activate = RcBlock::new(move |_: NonNull<NSNotification>| {
+            super::activation::note_activation();
             activated.frontmost_changed.store(true, Ordering::Release);
         });
         let mut observers = Vec::with_capacity(6);

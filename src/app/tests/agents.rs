@@ -33,6 +33,7 @@ fn idle() -> macos::RecentInput {
         mouse_down: 30.0,
         modifiers_changed: 30.0,
         command_held: false,
+        activated: None,
     }
 }
 
