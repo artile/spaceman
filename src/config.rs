@@ -3,9 +3,12 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+mod agents;
 mod disposition;
 mod labs;
 mod write;
+pub use agents::AgentsConfig;
+use agents::RawAgents;
 pub use disposition::{DispositionPatch, Management};
 pub use labs::{LabFeature, LabsConfig};
 pub use write::{
@@ -208,6 +211,7 @@ pub struct Config {
     workspace_monitors: Vec<(WorkspaceId, DisplaySelector)>,
     workspace_order: Vec<WorkspaceId>,
     shortcuts: Shortcuts,
+    agents: AgentsConfig,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -236,6 +240,8 @@ struct WindowRule {
 
 #[derive(Clone, Debug)]
 struct WindowMatcher {
+    /// `agent = true`: only windows of a process an agent claimed (`ctl agent claim`).
+    agent: bool,
     bundle_id: Option<String>,
     title: Option<String>,
     /// Lowercased; matched case-insensitively against the live title, in memory only.
@@ -256,6 +262,8 @@ struct RawConfig {
     workspaces: Vec<RawWorkspace>,
     #[serde(default)]
     shortcuts: RawShortcuts,
+    #[serde(default)]
+    agents: RawAgents,
 }
 
 #[derive(Deserialize)]
@@ -349,6 +357,8 @@ const fn default_trackpad_swipe() -> bool {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawWindowRule {
+    #[serde(default)]
+    agent: bool,
     bundle_id: Option<String>,
     title: Option<String>,
     title_contains: Option<String>,
@@ -381,7 +391,11 @@ impl Config {
         }
         let mut rules = Vec::with_capacity(raw.rules.len());
         for rule in raw.rules {
-            if rule.bundle_id.is_none() && rule.title.is_none() && rule.title_contains.is_none() {
+            if !rule.agent
+                && rule.bundle_id.is_none()
+                && rule.title.is_none()
+                && rule.title_contains.is_none()
+            {
                 return Err("window rule must contain at least one matcher".into());
             }
             if rule.title_contains.as_deref().is_some_and(str::is_empty) {
@@ -412,6 +426,7 @@ impl Config {
             };
             rules.push(WindowRule {
                 matcher: WindowMatcher {
+                    agent: rule.agent,
                     bundle_id: rule.bundle_id,
                     title: rule.title,
                     title_contains: rule.title_contains.map(|value| value.to_lowercase()),
@@ -441,6 +456,7 @@ impl Config {
                 ));
             }
         }
+        let agents = raw.agents.parse()?;
         let mut shortcuts = raw.shortcuts.parse()?;
         shortcuts.scratchpad = raw.labs.scratchpad;
         shortcuts.workspace_steps = raw.labs.workspace_steps;
@@ -460,6 +476,29 @@ impl Config {
             workspace_monitors,
             workspace_order: raw.settings.workspace_order,
             shortcuts,
+            agents,
+        })
+    }
+
+    /// The `[agents]` table: the agent workspace and its label.
+    #[must_use]
+    pub const fn agents(&self) -> &AgentsConfig {
+        &self.agents
+    }
+
+    /// Where an agent's windows go: the first rule that matches only `agent = true` and routes.
+    /// `ctl agent claim` moves the claimed process's open windows there.
+    #[must_use]
+    pub fn agent_route(&self) -> Option<WorkspaceId> {
+        self.rules.iter().find_map(|rule| match rule.action {
+            WindowDisposition::Route(workspace)
+                if rule.matcher.agent
+                    && rule.matcher.bundle_id.is_none()
+                    && !rule.matcher.matches_titles() =>
+            {
+                Some(workspace)
+            }
+            _ => None,
         })
     }
 
@@ -678,9 +717,11 @@ impl Config {
 
 impl WindowMatcher {
     fn matches(&self, bundle_id: &str, window: &ObservedWindow) -> bool {
-        self.bundle_id
-            .as_deref()
-            .is_none_or(|value| value == bundle_id)
+        (!self.agent || crate::agents::is_agent(window.id.app.pid))
+            && self
+                .bundle_id
+                .as_deref()
+                .is_none_or(|value| value == bundle_id)
             && self
                 .title
                 .as_deref()

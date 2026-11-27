@@ -86,6 +86,23 @@ action = "route"
 workspace = 4
 windows = "all"
 
+# agent = true matches the windows of a process an AI agent claimed with
+# `spaceman ctl agent claim <pid>`. Claiming also moves the process's open
+# windows to the first agent-only route rule's workspace.
+[[rules]]
+agent = true
+action = "route"
+workspace = 8
+windows = "all"
+
+# The agent workspace: an agent window that raises itself there never switches
+# you to it, and focus stays where you are. A click (the Dock, a notification)
+# or a Command chord such as Command-Tab still switches. The label replaces the
+# workspace number in the HUD and the menu bar menu (at most 8 characters).
+[agents]
+workspace = 8
+label = "AI"
+
 # Named workspaces A-Z are opt-in. Configuring one registers Option+letter to
 # switch and Option+Shift+letter to move the focused window there.
 [[rules]]

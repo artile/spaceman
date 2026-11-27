@@ -422,11 +422,9 @@ impl Workspaces {
                     .slots
                     .iter()
                     .any(|slot| slot.belongs_to(app))
-                    || self
-                        .floating_entries()
-                        .any(|(window, owner)| {
-                            owner == *workspace && &window.app == app && !self.is_pinned(window)
-                        }))
+                    || self.floating_entries().any(|(window, owner)| {
+                        owner == *workspace && &window.app == app && !self.is_pinned(window)
+                    }))
         });
         let workspace = matches.next()?;
         matches.next().is_none().then_some(workspace)

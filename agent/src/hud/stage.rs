@@ -114,6 +114,7 @@ fn hud_workspace(number: u8, workspace: &DemoWorkspace) -> Option<UiHudWorkspace
         .collect();
     Some(UiHudWorkspace {
         workspace: WorkspaceId::new(number).ok()?,
+        label: None,
         fullscreen: workspace.shape == Shape::Fullscreen,
         tiles,
         floating: Vec::new(),

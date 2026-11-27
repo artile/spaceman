@@ -23,6 +23,8 @@ pub(crate) struct DisplayWorkspaces {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct MenuWorkspace {
     pub(crate) workspace: WorkspaceId,
+    /// Shown instead of the workspace id: the `[agents] label` of the agent workspace.
+    pub(crate) label: Option<String>,
     pub(crate) current: bool,
     /// Process IDs of the apps with windows on the workspace, in tile order, without repeats.
     pub(crate) apps: Vec<i32>,
@@ -64,7 +66,10 @@ fn item(
     target: &Target,
     marker: MainThreadMarker,
 ) -> Retained<NSMenuItem> {
-    let label = workspace.workspace.to_string();
+    let label = workspace
+        .label
+        .clone()
+        .unwrap_or_else(|| workspace.workspace.to_string());
     let item = super::action_item(
         &label,
         target,

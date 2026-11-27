@@ -612,6 +612,7 @@ fn status_menu_lists_each_displays_visible_and_occupied_workspaces() {
 
     let entry = |workspace, current, apps: &[i32]| status_item::MenuWorkspace {
         workspace,
+        label: None,
         current,
         apps: apps.to_vec(),
     };

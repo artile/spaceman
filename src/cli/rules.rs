@@ -304,6 +304,7 @@ fn run_add(args: &[&str], path_override: Option<&Path>) -> Result<String, String
         ActionArg::Ignore => ("ignore".to_owned(), None),
     };
     let rule = RuleDoc {
+        agent: false,
         bundle_id: options.app,
         title: options.title,
         title_contains: options.title_contains,
@@ -470,6 +471,7 @@ fn run_remove(args: &[&str], path_override: Option<&Path>) -> Result<String, Str
     } else if removed.len() == 1 {
         let entry = &removed[0];
         let rule = RuleDoc {
+            agent: entry.agent,
             bundle_id: entry.bundle_id.clone(),
             title: entry.title.clone(),
             title_contains: entry.title_contains.clone(),

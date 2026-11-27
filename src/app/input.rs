@@ -670,7 +670,9 @@ mod tests {
         assert!(!admits_action(&three, Fingers::Four, never));
         assert!(admits_action(&four, Fingers::Four, idle));
         // A pointer drag still drops the configured swipe.
-        assert!(!admits_action(&four, Fingers::Four, || (true, false, false)));
+        assert!(!admits_action(&four, Fingers::Four, || (
+            true, false, false
+        )));
         // Other actions are untouched.
         let switch = WorkerAction::SwitchWorkspace(crate::WorkspaceId::TWO);
         assert!(admits_action(&switch, Fingers::Four, never));

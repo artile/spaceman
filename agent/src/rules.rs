@@ -656,6 +656,11 @@ impl Doc {
 }
 
 fn read_rule(index: usize, table: &dyn TableLike) -> Option<Rule> {
+    // An `agent = true` rule matches processes, not an app: the Rules pane has no row for it,
+    // and the file keeps it as written.
+    if table.get("agent").and_then(Item::as_bool) == Some(true) {
+        return None;
+    }
     let place = match table.get("action").and_then(Item::as_str)? {
         "float" => Place::Float,
         "pin" => Place::Pin,

@@ -30,6 +30,18 @@ pub(crate) struct ConfigDoc {
     /// `[shortcuts]`, carried through untouched: no CLI command edits it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shortcuts: Option<ShortcutsDoc>,
+    /// `[agents]`, carried through untouched: no CLI command edits it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agents: Option<AgentsDoc>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AgentsDoc {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<WorkspaceId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -137,6 +149,7 @@ impl Default for ConfigDoc {
             rules: Vec::new(),
             workspaces: Vec::new(),
             shortcuts: None,
+            agents: None,
         }
     }
 }
@@ -379,6 +392,8 @@ fn serialize_optional_mouse_follows_focus<S: serde::Serializer>(
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RuleDoc {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -425,6 +440,8 @@ pub(crate) struct EffectiveGaps {
 #[derive(Clone, Debug, Serialize)]
 pub(crate) struct RuleView {
     pub index: usize,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub agent: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bundle_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -442,6 +459,7 @@ impl RuleView {
     pub(crate) fn from_doc(index: usize, rule: &RuleDoc) -> Self {
         Self {
             index,
+            agent: rule.agent,
             bundle_id: rule.bundle_id.clone(),
             title: rule.title.clone(),
             title_contains: rule.title_contains.clone(),
@@ -464,6 +482,8 @@ struct EffectiveConfigToml<'a> {
     workspaces: &'a [WorkspaceDoc],
     #[serde(skip_serializing_if = "Option::is_none")]
     shortcuts: Option<&'a ShortcutsDoc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    agents: Option<&'a AgentsDoc>,
 }
 
 impl ConfigDoc {
@@ -533,6 +553,7 @@ impl ConfigDoc {
             rules: &self.rules,
             workspaces: &self.workspaces,
             shortcuts: self.shortcuts.as_ref(),
+            agents: self.agents.as_ref(),
         };
         let rendered = toml::to_string_pretty(&view)
             .map_err(|error| format!("failed to format config.toml: {error}"))?;
@@ -615,6 +636,9 @@ pub(crate) fn default_monitor_for(workspace: WorkspaceId) -> &'static str {
 
 pub(crate) fn format_rule_summary(rule: &RuleDoc) -> String {
     let mut matchers = Vec::new();
+    if rule.agent {
+        matchers.push("agent".to_owned());
+    }
     if let Some(bundle_id) = &rule.bundle_id {
         matchers.push(format!("bundle_id={bundle_id}"));
     }

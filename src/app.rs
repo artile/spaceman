@@ -41,6 +41,7 @@ macro_rules! log_event {
     }};
 }
 
+mod agents;
 mod app_loop;
 mod arrange;
 mod backend;
@@ -262,6 +263,8 @@ pub(crate) enum WorkerAction {
         follow: bool,
     },
     MoveApp(String, WorkspaceId),
+    /// Move the open windows of a process an agent just claimed to the agent route's workspace.
+    RouteAgent(i32),
     /// Send the focused window's active tab to a workspace through the app's
     /// own "Move Tab to New Window"; a single-tab window moves whole.
     MoveTab {
@@ -312,6 +315,7 @@ impl WorkerAction {
                 format!("move {}{follow} queued", step.as_str())
             }
             Self::MoveApp(_, workspace) => format!("move app to workspace {workspace} queued"),
+            Self::RouteAgent(pid) => format!("agent process {pid} claimed"),
             Self::MoveTab {
                 target,
                 follow: false,

@@ -69,7 +69,8 @@ pub(super) trait WorkspaceBackend {
     }
     fn focused_window(&mut self) -> Option<crate::PhysicalWindowId>;
     fn frontmost_application(&mut self) -> Option<AppInstanceId>;
-    /// Diagnostics only: recent user input timing for focus-follow logs.
+    /// Recent user input timing: focus-follow logs, and whether an activation of the agent
+    /// workspace was the user's own.
     fn recent_input(&mut self) -> Option<macos::RecentInput> {
         None
     }

@@ -40,6 +40,7 @@ impl MainThreadAgent {
                     &action.queued_acknowledgement(),
                 ),
                 ControlCommand::Queue(_) => Err("automatic tiling is paused".into()),
+                ControlCommand::Agent(command) => self.agent_command(command),
                 ControlCommand::Restart if self.worker.is_busy() => {
                     Err("Spaceman is busy; retry restart".into())
                 }
@@ -58,6 +59,37 @@ impl MainThreadAgent {
                 ControlCommand::Quit => self.queue_action(Action::Quit, "quit queued"),
             };
             request.respond(response);
+        }
+    }
+
+    /// The registry lives in this process, so a claim holds while tiling is paused; the
+    /// claimed process's open windows move only while tiling runs.
+    fn agent_command(&self, command: control::AgentCommand) -> Result<String, String> {
+        match command {
+            control::AgentCommand::Claim(pid) => {
+                let new = crate::agents::claim(pid)?;
+                log_event!("agent claim: pid {pid}");
+                if self.automatic {
+                    let action = WorkerAction::RouteAgent(pid);
+                    let ack = action.queued_acknowledgement();
+                    self.queue_action(Action::Worker(action), &ack)
+                } else if new {
+                    Ok(format!("agent process {pid} claimed"))
+                } else {
+                    Ok(format!("agent process {pid} already claimed"))
+                }
+            }
+            control::AgentCommand::Release(pid) => {
+                log_event!("agent release: pid {pid}");
+                Ok(if crate::agents::release(pid) {
+                    format!("agent process {pid} released")
+                } else {
+                    format!("agent process {pid} was not claimed")
+                })
+            }
+            control::AgentCommand::List => {
+                serde_json::to_string(&crate::agents::list()).map_err(|error| error.to_string())
+            }
         }
     }
 

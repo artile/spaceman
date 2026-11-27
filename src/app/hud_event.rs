@@ -30,6 +30,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                         }
                         status_item::MenuWorkspace {
                             workspace,
+                            label: self.config.agents().label_for(workspace).map(str::to_owned),
                             current: current == Some(workspace),
                             apps,
                         }
@@ -184,6 +185,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
         }
         UiHudWorkspace {
             workspace,
+            label: self.config.agents().label_for(workspace).map(str::to_owned),
             fullscreen,
             tiles,
             floating,

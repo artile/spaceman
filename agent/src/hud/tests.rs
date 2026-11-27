@@ -48,6 +48,7 @@ fn workspace(number: u8, apps: &[&str]) -> UiHudWorkspace {
     let count = apps.len().max(1) as i32;
     UiHudWorkspace {
         workspace: id(number),
+        label: None,
         fullscreen: false,
         tiles: apps
             .iter()
@@ -359,6 +360,7 @@ fn visited_empty_workspaces_keep_the_configured_workspace_order() {
             workspace(1, &["a"]),
             UiHudWorkspace {
                 workspace: named(visible),
+                label: None,
                 fullscreen: false,
                 tiles: Vec::new(),
                 floating: Vec::new(),

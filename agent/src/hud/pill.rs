@@ -101,6 +101,7 @@ impl HudView<'_> {
                     at,
                     UiHudWorkspace {
                         workspace,
+                        label: None,
                         fullscreen: false,
                         tiles: Vec::new(),
                         floating: Vec::new(),

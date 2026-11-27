@@ -39,6 +39,9 @@ Spaceman currently:
 - keeps movable non-resizable and rule-floated windows with their logical workspace without tiling
   or resizing them, floats small utilities such as Stickies and Calculator by default, and can pin
   a floating window on every workspace (`action = "pin"` or `spaceman ctl pin`);
+- keeps AI agents' windows on an agent workspace that never steals focus: an agent claims its
+  process (`spaceman ctl agent claim <pid>`), an `agent = true` rule routes its windows, and
+  `[agents] workspace` stops self-raised agent windows from switching you there;
 - exposes a local CLI over a user-only Unix socket.
 
 Spaceman uses Accessibility APIs to observe, focus, move, and resize eligible windows. It requires no

@@ -132,6 +132,9 @@ Focus follows                                              // ws.focus-follow
 │       -> follows once the slide settles; a follow the slide made fail is retried, not re-homed
 ├── Focusing a window on another display's visible workspace -> no switch; Option+Tab remembers it
 ├── Focusing a pinned window (`action = "pin"`, `ctl pin`) -> never switches: it shows everywhere
+├── A window on the hidden `[agents] workspace` takes focus with no click in 0.6 s and no
+│   Command chord in 1 s -> no switch; focus returns to the current workspace's entry window
+│   (`focus follow held` in agent.log; src/app/tests/agents.rs)
 └── No focused window reported -> follows the frontmost app only when all its windows, tiled
     or floating, are on one workspace
 

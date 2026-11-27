@@ -76,6 +76,16 @@ action = "route"
 workspace = 4
 windows = "all"                       # optional, route only: "first" (default) or "all"
 
+[[rules]]
+agent = true                          # optional; only windows of a process `ctl agent claim` named
+action = "route"
+workspace = 9
+windows = "all"
+
+[agents]                              # optional
+workspace = 9                         # focus follow never switches here on its own
+label = "AI"                          # optional; up to 8 characters, shown in the HUD and menu
+
 [[workspaces]]
 workspace = 9                         # 1 through 10 or "A" through "Z"; unique
 monitor = "main"                      # non-empty selector
@@ -126,6 +136,31 @@ may return to a remembered workspace; see [Remembered Placements](#remembered-pl
 Title matching (`title` and `title_contains`) occurs only in memory, against the live title of a
 newly observed window. Titles are not serialized into persisted state, snapshots, `ctl debug`, or
 the HUD; only the filter you write lives in `config.toml`.
+
+## Agent Workspace
+
+AI agents that drive apps on this Mac (a browser, a native app through Accessibility) open and
+raise windows while you work. The agent workspace keeps those windows out of your way:
+
+1. The agent claims its process: `spaceman ctl agent claim <pid>`. An app launched through
+   Launch Services has `launchd` as its parent, so Spaceman cannot tell from the process tree
+   which apps an agent drives. `ctl agent release <pid>` forgets one, and `ctl agent list`
+   prints the claimed processes that still run. Claims live in memory: a Spaceman restart forgets
+   them, and the agent claims again.
+2. A rule with `agent = true` matches only windows of claimed processes. It combines with the
+   other matchers, and first-match order applies as for every rule. When the first rule that has
+   no other matcher routes, `claim` also moves the process's open windows to its workspace.
+3. `[agents] workspace` names the agent workspace. When a window there takes focus on its own,
+   Spaceman does not switch to it: the display keeps its workspace and focus goes back to the
+   window you were on, so your keys never land in a hidden agent window. A click within 0.6 s
+   (the Dock, a notification, a HUD slot) or a key chord with Command within 1 s (Command-Tab)
+   still switches. `agent.log` records each held follow as `focus follow held`.
+4. `[agents] label` replaces the workspace's number in the HUD and the menu bar menu.
+
+An app used only by agents (a Chrome profile that only agents run) needs no claim: route its
+bundle ID to the agent workspace with an ordinary rule and `windows = "all"`.
+
+The Rules pane in Settings does not list `agent = true` rules; edit them in `config.toml`.
 
 ## Workspace HUD
 

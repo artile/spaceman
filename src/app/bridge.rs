@@ -143,6 +143,8 @@ pub struct UiHudDisplay {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiHudWorkspace {
     pub workspace: WorkspaceId,
+    /// Drawn instead of the workspace id: the `[agents] label` of the agent workspace.
+    pub label: Option<String>,
     /// Fullscreen Layout: the first tile is the window in front.
     pub fullscreen: bool,
     /// Tiles in layout order.

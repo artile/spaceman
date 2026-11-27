@@ -23,7 +23,7 @@ const REQUEST_READ_TIMEOUT: Duration = Duration::from_millis(250);
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(6);
 
-pub const COMMAND_USAGE: &str = "status|debug|settings|open TARGET|open-settings|open-accessibility|check-for-updates|toggle-launch-at-login|switch WORKSPACE|switch next|prev|back-and-forth|move-workspace [next|prev|DISPLAY]|move WORKSPACE [--follow]|move next|prev [--follow]|move-tab WORKSPACE [--follow]|move-app ID WORKSPACE|focus DIR|focus next|focus prev|move-direction DIR|layout|fullscreen|float|pin|resize shrink|resize grow|resize width|height POINTS|balance|scratchpad toggle|scratchpad mark|pause|resume|retile|wrong|restart|quit";
+pub const COMMAND_USAGE: &str = "status|debug|settings|open TARGET|open-settings|open-accessibility|check-for-updates|toggle-launch-at-login|switch WORKSPACE|switch next|prev|back-and-forth|move-workspace [next|prev|DISPLAY]|move WORKSPACE [--follow]|move next|prev [--follow]|move-tab WORKSPACE [--follow]|move-app ID WORKSPACE|focus DIR|focus next|focus prev|move-direction DIR|layout|fullscreen|float|pin|resize shrink|resize grow|resize width|height POINTS|balance|scratchpad toggle|scratchpad mark|pause|resume|retile|wrong|agent claim|release PID|agent list|restart|quit";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Command {
@@ -35,10 +35,19 @@ pub(crate) enum Command {
     Open(DeepLink),
     App(crate::app::Action),
     Queue(WorkerAction),
+    /// Claim or release an agent's process, or list the claimed ones (`agent = true` rules).
+    Agent(AgentCommand),
     Pause,
     Resume,
     Restart,
     Quit,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum AgentCommand {
+    Claim(i32),
+    Release(i32),
+    List,
 }
 
 pub(crate) struct Request {
@@ -262,6 +271,17 @@ fn parse_line(line: &str) -> Result<Command, String> {
         ["scratchpad", command] => WorkerAction::Scratchpad(
             ScratchpadCommand::parse(command).ok_or("expected scratchpad toggle|mark")?,
         ),
+        ["agent", "list"] => return Ok(Command::Agent(AgentCommand::List)),
+        ["agent", verb @ ("claim" | "release"), pid] => {
+            let pid = pid
+                .parse::<i32>()
+                .map_err(|_| format!("expected a pid, got {pid:?}"))?;
+            return Ok(Command::Agent(if *verb == "claim" {
+                AgentCommand::Claim(pid)
+            } else {
+                AgentCommand::Release(pid)
+            }));
+        }
         ["retile"] => WorkerAction::Retile,
         ["wrong"] => WorkerAction::MarkWrong,
         _ => return Err(format!("expected {COMMAND_USAGE}")),
@@ -281,6 +301,19 @@ mod tests {
             command => panic!("{line:?} parsed as {command:?}"),
         };
         assert_eq!(parse_line("status").unwrap(), Command::Status);
+        assert_eq!(
+            parse_line("agent claim 42").unwrap(),
+            Command::Agent(AgentCommand::Claim(42))
+        );
+        assert_eq!(
+            parse_line("agent release 42").unwrap(),
+            Command::Agent(AgentCommand::Release(42))
+        );
+        assert_eq!(
+            parse_line("agent list").unwrap(),
+            Command::Agent(AgentCommand::List)
+        );
+        assert!(parse_line("agent claim chrome").is_err());
         assert_eq!(queued("wrong"), WorkerAction::MarkWrong);
         assert_eq!(
             queued("back-and-forth"),

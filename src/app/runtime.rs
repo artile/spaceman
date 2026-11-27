@@ -264,6 +264,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
             WorkerAction::MoveApp(bundle_id, workspace) => {
                 self.move_app(&bundle_id, workspace, outputs, cancelled)
             }
+            WorkerAction::RouteAgent(pid) => self.route_agent(pid, outputs, cancelled),
             WorkerAction::MoveTab { target, follow } => {
                 self.move_tab(target, follow, outputs, cancelled)
             }

@@ -147,7 +147,28 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
         );
         if !suppressed {
             self.clear_suppressed_focus();
-            if let Some(workspace) = focus_workspace {
+            // An agent window that raised itself on the hidden agent workspace: the user stays,
+            // and focus goes back to the workspace they were on. Explicit input still follows.
+            let agent_hold = focus_workspace.filter(|workspace| {
+                self.config.agents().guards(*workspace)
+                    && !visible
+                        .iter()
+                        .any(|resolved| resolved.workspace == *workspace)
+            });
+            let recent = agent_hold.and_then(|_| self.backend.recent_input());
+            let agent_hold =
+                agent_hold.filter(|_| !recent.as_ref().is_some_and(super::agents::explicit));
+            if let Some(workspace) = agent_hold {
+                log_event!(
+                    "focus follow held: {:?} -> agent workspace {} ({})",
+                    focused,
+                    workspace,
+                    recent
+                        .as_ref()
+                        .map_or_else(|| "input unknown".into(), ToString::to_string)
+                );
+                self.return_focus_from_agents(&visible, focused.clone(), frontmost.clone());
+            } else if let Some(workspace) = focus_workspace {
                 if !visible
                     .iter()
                     .any(|resolved| resolved.workspace == workspace)

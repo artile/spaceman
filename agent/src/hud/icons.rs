@@ -88,7 +88,10 @@ pub fn track_with_mode(
     let mut marker = None;
     let mut cells = Vec::with_capacity(entries.len());
     for entry in entries {
-        let label = entry.workspace.to_string();
+        let label = entry
+            .label
+            .clone()
+            .unwrap_or_else(|| entry.workspace.to_string());
         let number = number_width(&label);
         let apps = apps(entry);
         let width = group_width(number, apps.len());

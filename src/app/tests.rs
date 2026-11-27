@@ -1,3 +1,4 @@
+mod agents;
 mod arrange;
 mod benchmarks;
 mod cross_display;
@@ -139,6 +140,8 @@ struct FakeBackend {
     other_button_down: bool,
     /// When macOS last changed the active Space.
     space_changed_at: Option<Instant>,
+    /// Recent user input timing; `None` when unknown.
+    recent_input: Option<macos::RecentInput>,
     /// The next position write starts a Space slide (Cmd+Tab out of a
     /// native fullscreen app while a focus follow runs).
     space_change_on_position: bool,
@@ -370,6 +373,10 @@ impl WorkspaceBackend for FakeBackend {
 
     fn active_space_changed_at(&mut self) -> Option<Instant> {
         self.space_changed_at
+    }
+
+    fn recent_input(&mut self) -> Option<macos::RecentInput> {
+        self.recent_input
     }
 
     fn raise_window(&mut self, window: &crate::PhysicalWindowId) -> bool {

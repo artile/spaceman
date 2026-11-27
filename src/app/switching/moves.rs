@@ -74,6 +74,48 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
             self.cycle(outputs.clone(), cancelled)?;
             windows = self.windows_for_bundle(bundle_id);
         }
+        self.move_windows(windows, target, outputs, cancelled)?
+            .ok_or_else(|| format!("No managed window found for {bundle_id}"))
+    }
+
+    /// `ctl agent claim`: the claimed process's open windows go where the agent route sends new
+    /// ones. Without an agent route, or when the process has no managed window, nothing moves.
+    pub(in crate::app) fn route_agent(
+        &mut self,
+        pid: i32,
+        outputs: macos::DisplayOutputs,
+        cancelled: &AtomicBool,
+    ) -> Result<CycleStatus, String> {
+        let Some(target) = self.config.agent_route() else {
+            return Ok(self.status(0, &outputs));
+        };
+        let mut windows = self.windows_for_pid(pid);
+        if windows.is_empty() {
+            self.cycle(outputs.clone(), cancelled)?;
+            windows = self.windows_for_pid(pid);
+        }
+        windows.retain(|window| self.workspaces.workspace_of_any(window) != Some(target));
+        if windows.is_empty() {
+            return Ok(self.status(0, &outputs));
+        }
+        log_event!(
+            "agent route: pid {pid} -> workspace {target} ({} window(s))",
+            windows.len()
+        );
+        match self.move_windows(windows, target, outputs.clone(), cancelled)? {
+            Some(status) => Ok(status),
+            None => Ok(self.status(0, &outputs)),
+        }
+    }
+
+    /// Moves `windows` to `target` and hands focus on when it left with them.
+    fn move_windows(
+        &mut self,
+        windows: Vec<crate::PhysicalWindowId>,
+        target: WorkspaceId,
+        outputs: macos::DisplayOutputs,
+        cancelled: &AtomicBool,
+    ) -> Result<Option<CycleStatus>, String> {
         let focused_before = self.backend.focused_window();
         let frontmost_before = self.backend.frontmost_application();
         let focused_source = focused_before
@@ -122,11 +164,17 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
             );
             self.persist_workspace_state_if_changed()?;
         }
-        status.ok_or_else(|| format!("No managed window found for {bundle_id}"))
+        Ok(status)
     }
 
-    /// Every window of the bundle Spaceman owns: its tiles, then its floats.
-    fn windows_for_bundle(&self, bundle_id: &str) -> Vec<crate::PhysicalWindowId> {
+    /// Every window of the process Spaceman owns: its tiles, then its floats.
+    fn windows_for_pid(&self, pid: i32) -> Vec<crate::PhysicalWindowId> {
+        self.owned_windows()
+            .filter(|window| window.app.pid == pid)
+            .collect()
+    }
+
+    fn owned_windows(&self) -> impl Iterator<Item = crate::PhysicalWindowId> + '_ {
         let mut floating: Vec<_> = self
             .workspaces
             .floating_entries()
@@ -136,6 +184,11 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
         WorkspaceId::all()
             .flat_map(|workspace| self.workspaces.engine(workspace).bound_windows())
             .chain(floating)
+    }
+
+    /// Every window of the bundle Spaceman owns: its tiles, then its floats.
+    fn windows_for_bundle(&self, bundle_id: &str) -> Vec<crate::PhysicalWindowId> {
+        self.owned_windows()
             .filter(|window| self.bundle_id(&window.app) == Some(bundle_id))
             .collect()
     }

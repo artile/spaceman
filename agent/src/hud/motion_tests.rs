@@ -197,6 +197,7 @@ fn workspace(number: u8, apps: &[&str]) -> UiHudWorkspace {
     let count = apps.len().max(1) as i32;
     UiHudWorkspace {
         workspace: id(number),
+        label: None,
         fullscreen: false,
         tiles: apps
             .iter()
