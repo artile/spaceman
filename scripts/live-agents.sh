@@ -3,11 +3,14 @@
 # native app through cua-driver, and the operator must never see them or lose focus.
 #
 # Usage: scripts/live-agents.sh [--cases LIST] [--max-visible-ms N] [--force]
-#   --cases           comma list (default chrome-window,cua-calculator):
+#   --cases           comma list (default all but chrome-restart):
 #                       chrome-window   agent opens a new Chrome Agents window, loads a page, closes it
 #                       chrome-restart  agent stops Chrome Agents, starts it again, loads a page, releases
 #                                       (closes every agent's tabs: refused while a lease is in use)
 #                       cua-calculator  agent launches Calculator, presses 7 + 5 =, reads 12, quits it
+#                       cua-textedit    agent launches TextEdit on a new file with cua-driver launch_app,
+#                                       types into it, reads it back, quits it (first-window path)
+#                       open-textedit   the same, launched with open -g -j (born behind the operator)
 #   --max-visible-ms  how long a test window may show on a display (default 0)
 #   --force           run chrome-restart even when another agent used Chrome in the last 15 minutes
 #
@@ -21,7 +24,7 @@ here="$root/scripts/live-agents"
 SPACEMAN="${SPACEMAN:-$HOME/.local/bin/spaceman}"
 SKILLS="${SKILLS:-/Users/tao/Tools/claude-skills/skills/browser-use/scripts}"
 SUPPORT="$HOME/Library/Application Support/Spaceman"
-cases="chrome-window,cua-calculator"
+cases="chrome-window,cua-calculator,cua-textedit,open-textedit"
 max_visible=0
 force=0
 while [[ $# -gt 0 ]]; do
@@ -29,7 +32,7 @@ while [[ $# -gt 0 ]]; do
     --cases) cases=$2; shift 2 ;;
     --max-visible-ms) max_visible=$2; shift 2 ;;
     --force) force=1; shift ;;
-    *) sed -n '2,19p' "$0" >&2; exit 2 ;;
+    *) sed -n '2,22p' "$0" >&2; exit 2 ;;
   esac
 done
 
@@ -127,12 +130,42 @@ case_cua_calculator() {
   record cua-calculator "$pid" "$start" "${out:-no output}"
 }
 
+# TextEdit opens a document it never saw at its default spot on the display: the first-window path.
+# $1 = case name, $2 = launcher: cua (cua-driver launch_app) or open (open -g -j: behind the operator).
+case_textedit() {
+  local name=$1 how=$2 start file launch pid wid out
+  start=$(now_ms)
+  file="$run/$name.txt"
+  : >"$file"
+  "$SPACEMAN" ctl agent expect com.apple.TextEdit >/dev/null
+  if [[ "$how" == cua ]]; then
+    launch=$(cua-driver call launch_app "{\"bundle_id\":\"com.apple.TextEdit\",\"urls\":[\"$file\"],\"creates_new_application_instance\":true,\"additional_arguments\":[\"-ApplePersistenceIgnoreState\",\"YES\"]}" 2>&1)
+    pid=$(printf '%s' "$launch" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("pid",""))' 2>/dev/null || true)
+  else
+    open -g -j -n -a TextEdit "$file" --args -ApplePersistenceIgnoreState YES
+    for _ in $(seq 1 20); do pid=$(pgrep -nx TextEdit || true); [[ -n "$pid" ]] && break; sleep 0.1; done
+  fi
+  [[ -n "$pid" ]] || { record "$name" "" "$start" "launch failed: ${launch:0:120}"; return; }
+  "$SPACEMAN" ctl agent claim "$pid" >/dev/null 2>&1 || true
+  for _ in $(seq 1 20); do
+    wid=$(cua-driver call list_windows "{\"pid\":$pid}" | python3 -c 'import json,sys; w=json.load(sys.stdin).get("windows",[]); print(w[0]["window_id"] if w else "")')
+    [[ -n "$wid" ]] && break
+    sleep 0.25
+  done
+  out=$(PID=$pid WID=$wid SESSION="spaceman-live-$$" python3 "$here/textedit.py" 2>&1 | tail -1) || true
+  kill "$pid" 2>/dev/null || true
+  "$SPACEMAN" ctl agent release "$pid" >/dev/null 2>&1 || true
+  record "$name" "$pid" "$start" "${out:-no output}"
+}
+
 IFS=',' read -ra wanted <<<"$cases"
 for c in "${wanted[@]}"; do
   case "$c" in
     chrome-window) case_chrome_window ;;
     chrome-restart) case_chrome_restart ;;
     cua-calculator) case_cua_calculator ;;
+    cua-textedit) case_textedit cua-textedit cua ;;
+    open-textedit) case_textedit open-textedit open ;;
     *) fail "unknown case $c" ;;
   esac
   sleep 1

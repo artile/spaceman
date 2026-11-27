@@ -1,5 +1,5 @@
 // winwatch: logs, until SIGTERM, each change of the frontmost app and of every window that did not
-// exist at start (frame, on screen, % visible on a display, z order). One line per change, flushed.
+// exist at start (frame, on screen, % the operator can see, z order). One line per change, flushed.
 import AppKit
 
 setvbuf(stdout, nil, _IOLBF, 0)
@@ -13,6 +13,10 @@ let initial = Set(list().compactMap { $0[kCGWindowNumber as String] as? Int })
 let mainHeight = NSScreen.screens.first?.frame.height ?? 0
 let displays = NSScreen.screens.map {
   CGRect(x: $0.frame.minX, y: mainHeight - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height)
+}
+func bounds(_ w: [String: Any]) -> CGRect? {
+  guard let b = w[kCGWindowBounds as String] as? [String: CGFloat] else { return nil }
+  return CGRect(x: b["X"]!, y: b["Y"]!, width: b["Width"]!, height: b["Height"]!)
 }
 var last: [Int: String] = [:]
 var front: pid_t = -1
@@ -40,12 +44,23 @@ while true {
     let r = CGRect(x: b["X"]!, y: b["Y"]!, width: b["Width"]!, height: b["Height"]!)
     if r.width < 100 || r.height < 100 { continue }
     let on = (w[kCGWindowIsOnscreen as String] as? Bool) ?? false
-    let area = displays.map { d -> CGFloat in
-      let i = r.intersection(d)
-      return i.isNull ? 0 : i.width * i.height
-    }.reduce(0, +)
-    let pct = on ? min(100, Int(area * 100 / (r.width * r.height))) : 0
     let z = onscreen.firstIndex { ($0[kCGWindowNumber as String] as? Int) == id } ?? -1
+    // Share of the window the operator can see: on a display and under no window in front of it.
+    let covers = z > 0 ? onscreen[..<z].compactMap(bounds) : []
+    var seen = 0
+    let n = 24
+    if on {
+      for i in 0..<n {
+        for j in 0..<n {
+          let p = CGPoint(x: r.minX + (CGFloat(i) + 0.5) * r.width / CGFloat(n),
+                          y: r.minY + (CGFloat(j) + 0.5) * r.height / CGFloat(n))
+          if displays.contains(where: { $0.contains(p) }) && !covers.contains(where: { $0.contains(p) }) {
+            seen += 1
+          }
+        }
+      }
+    }
+    let pct = seen * 100 / (n * n)
     let key = "\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height)) on=\(on) visible=\(pct) z=\(z)"
     if last[id] != key {
       print("\(ms()) WIN \(id) pid=\(w[kCGWindowOwnerPID as String] ?? 0) \(key)")
