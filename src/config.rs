@@ -717,7 +717,12 @@ impl Config {
 
 impl WindowMatcher {
     fn matches(&self, bundle_id: &str, window: &ObservedWindow) -> bool {
-        (!self.agent || crate::agents::is_agent(window.id.app.pid))
+        (!self.agent
+            || crate::agents::is_agent_process(
+                window.id.app.pid,
+                bundle_id,
+                window.id.app.launched_at,
+            ))
             && self
                 .bundle_id
                 .as_deref()

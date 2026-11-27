@@ -147,6 +147,11 @@ raise windows while you work. The agent workspace keeps those windows out of you
    which apps an agent drives. `ctl agent release <pid>` forgets one, and `ctl agent list`
    prints the claimed processes that still run. Claims live in memory: a Spaceman restart forgets
    them, and the agent claims again.
+   A launcher that returns the pid only once the first window is up (cua-driver `launch_app`)
+   claims too late. Run `spaceman ctl agent expect <bundle-id>` before the launch instead: the
+   next process of that app that starts within 60 s is claimed when Spaceman first sees its
+   window, so that window goes straight to the agent workspace. A process the user already runs
+   never matches.
 2. A rule with `agent = true` matches only windows of claimed processes. It combines with the
    other matchers, and first-match order applies as for every rule. When the first rule that has
    no other matcher routes, `claim` also moves the process's open windows to its workspace.

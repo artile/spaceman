@@ -203,3 +203,32 @@ fn the_menu_shows_the_agent_label() {
     assert!(labels.contains(&(nine(), Some("AI".into()))));
     assert!(labels.contains(&(WorkspaceId::ONE, None)));
 }
+
+#[test]
+fn an_expected_launch_routes_its_first_window_straight_to_the_agent_workspace() {
+    crate::agents::expect("com.example.Launched").unwrap();
+    let now = crate::config::now().as_millis() as u64;
+    let created = crate::PhysicalWindowId {
+        app: AppInstanceId {
+            pid: 7011,
+            launched_at: now,
+        },
+        window_id: 12,
+    };
+    let mut backend = FakeBackend {
+        observation: Some(observation_for(
+            "com.example.Launched",
+            &created,
+            frame(100),
+        )),
+        ..FakeBackend::default()
+    };
+    backend.frames.insert(created.clone(), frame(100));
+    let mut runtime = runtime_with_config(backend, Config::parse(AGENTS).unwrap());
+
+    runtime.cycle(outputs(), &AtomicBool::new(false)).unwrap();
+
+    assert_eq!(runtime.workspaces.workspace_of(&created), Some(nine()));
+    assert!(crate::agents::is_agent(7011));
+    assert!(crate::agents::release(7011));
+}

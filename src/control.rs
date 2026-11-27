@@ -23,7 +23,7 @@ const REQUEST_READ_TIMEOUT: Duration = Duration::from_millis(250);
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(6);
 
-pub const COMMAND_USAGE: &str = "status|debug|settings|open TARGET|open-settings|open-accessibility|check-for-updates|toggle-launch-at-login|switch WORKSPACE|switch next|prev|back-and-forth|move-workspace [next|prev|DISPLAY]|move WORKSPACE [--follow]|move next|prev [--follow]|move-tab WORKSPACE [--follow]|move-app ID WORKSPACE|focus DIR|focus next|focus prev|move-direction DIR|layout|fullscreen|float|pin|resize shrink|resize grow|resize width|height POINTS|balance|scratchpad toggle|scratchpad mark|pause|resume|retile|wrong|agent claim|release PID|agent list|restart|quit";
+pub const COMMAND_USAGE: &str = "status|debug|settings|open TARGET|open-settings|open-accessibility|check-for-updates|toggle-launch-at-login|switch WORKSPACE|switch next|prev|back-and-forth|move-workspace [next|prev|DISPLAY]|move WORKSPACE [--follow]|move next|prev [--follow]|move-tab WORKSPACE [--follow]|move-app ID WORKSPACE|focus DIR|focus next|focus prev|move-direction DIR|layout|fullscreen|float|pin|resize shrink|resize grow|resize width|height POINTS|balance|scratchpad toggle|scratchpad mark|pause|resume|retile|wrong|agent claim|release PID|agent expect BUNDLE_ID|agent list|restart|quit";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Command {
@@ -43,9 +43,10 @@ pub(crate) enum Command {
     Quit,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum AgentCommand {
     Claim(i32),
+    Expect(String),
     Release(i32),
     List,
 }
@@ -272,6 +273,9 @@ fn parse_line(line: &str) -> Result<Command, String> {
             ScratchpadCommand::parse(command).ok_or("expected scratchpad toggle|mark")?,
         ),
         ["agent", "list"] => return Ok(Command::Agent(AgentCommand::List)),
+        ["agent", "expect", bundle_id] => {
+            return Ok(Command::Agent(AgentCommand::Expect((*bundle_id).into())));
+        }
         ["agent", verb @ ("claim" | "release"), pid] => {
             let pid = pid
                 .parse::<i32>()
@@ -314,6 +318,10 @@ mod tests {
             Command::Agent(AgentCommand::List)
         );
         assert!(parse_line("agent claim chrome").is_err());
+        assert_eq!(
+            parse_line("agent expect com.apple.TextEdit").unwrap(),
+            Command::Agent(AgentCommand::Expect("com.apple.TextEdit".into()))
+        );
         assert_eq!(queued("wrong"), WorkerAction::MarkWrong);
         assert_eq!(
             queued("back-and-forth"),

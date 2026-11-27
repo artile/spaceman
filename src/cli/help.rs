@@ -286,6 +286,8 @@ pub(crate) fn ctl_help(executable: &str) -> String {
         "Agents:",
         "  agent claim <pid>          Mark a process as an agent's: `agent = true` rules match its windows,",
         "                             and its open windows move to the agent route's workspace",
+        "  agent expect <bundle-id>   Claim the next process of that app that starts within 60 s;",
+        "                             run it before launching, so the first window opens there",
         "  agent release <pid>        Forget an agent's process",
         "  agent list                 Print the claimed processes that still run, as JSON",
         "",

@@ -40,7 +40,7 @@ impl MainThreadAgent {
                     &action.queued_acknowledgement(),
                 ),
                 ControlCommand::Queue(_) => Err("automatic tiling is paused".into()),
-                ControlCommand::Agent(command) => self.agent_command(command),
+                ControlCommand::Agent(ref command) => self.agent_command(command.clone()),
                 ControlCommand::Restart if self.worker.is_busy() => {
                     Err("Spaceman is busy; retry restart".into())
                 }
@@ -78,6 +78,14 @@ impl MainThreadAgent {
                 } else {
                     Ok(format!("agent process {pid} already claimed"))
                 }
+            }
+            control::AgentCommand::Expect(bundle_id) => {
+                crate::agents::expect(&bundle_id)?;
+                log_event!("agent expect: {bundle_id}");
+                Ok(format!(
+                    "the next {bundle_id} process within {} s is an agent's",
+                    crate::agents::EXPECT_FOR.as_secs()
+                ))
             }
             control::AgentCommand::Release(pid) => {
                 log_event!("agent release: pid {pid}");
