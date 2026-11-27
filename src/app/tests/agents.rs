@@ -260,3 +260,59 @@ fn an_agent_window_reopened_at_a_parking_spot_goes_to_the_agent_workspace_unseen
         runtime.backend.calls
     );
 }
+
+#[test]
+fn a_helper_window_accessibility_cannot_reach_is_never_adopted() {
+    // An app's 30-point helper strip after a display change: listed by the window server, gone
+    // to Accessibility. Owning it would leave a parked window no restore can bring back.
+    crate::agents::claim_for_test(7013);
+    let parked = main_parked_frame(outputs().main().frame);
+    let helper = agent_window(7013, 14);
+    let mut backend = FakeBackend {
+        observation: Some(observation_for("com.example.Agent", &helper, parked)),
+        frame_outcome: Some(macos::WindowAccessError::Gone),
+        ..FakeBackend::default()
+    };
+    backend.frames.insert(helper.clone(), parked);
+    let mut runtime = runtime_with_config(backend, Config::parse(AGENTS).unwrap());
+
+    runtime.cycle(outputs(), &AtomicBool::new(false)).unwrap();
+
+    assert_eq!(runtime.workspaces.workspace_of(&helper), None);
+    assert!(!runtime.parked.contains_key(&helper));
+}
+
+#[test]
+fn a_user_window_at_a_parking_spot_is_rescued_even_when_its_rule_routes_it_away() {
+    let routed = "version = 1
+[agents]
+workspace = 9
+
+[[rules]]
+bundle_id = 'com.example.User'
+action = 'route'
+workspace = 9
+windows = 'all'
+";
+    let parked = main_parked_frame(outputs().main().frame);
+    let reopened = window(15);
+    let mut backend = FakeBackend {
+        observation: Some(observation_for("com.example.User", &reopened, parked)),
+        ..FakeBackend::default()
+    };
+    backend.frames.insert(reopened.clone(), parked);
+    let mut runtime = runtime_with_config(backend, Config::parse(routed).unwrap());
+
+    runtime.cycle(outputs(), &AtomicBool::new(false)).unwrap();
+
+    let displays = outputs().frames().collect::<Vec<_>>();
+    assert!(
+        runtime.backend.calls.iter().any(|call| matches!(
+            call,
+            BackendCall::SetPosition(window, frame)
+                if *window == reopened && displays.iter().any(|d| d.contains_center(*frame))
+        )),
+        "{:?}",
+        runtime.backend.calls
+    );
+}

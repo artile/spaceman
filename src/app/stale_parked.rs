@@ -84,13 +84,17 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
             {
                 continue;
             }
-            // A window its rule routes to a hidden workspace would be parked there right after
-            // the rescue; rescuing it first flashes it on the user's screen (an agent's app
-            // reopening its window where Spaceman last parked it). It joins that workspace
-            // where it is.
+            // An agent's window its rule routes to a hidden workspace would be parked there right
+            // after the rescue; rescuing it first flashes it on the user's screen (an agent's app
+            // reopening its window where Spaceman last parked it). It joins that workspace where
+            // it is. Only a window Accessibility reaches: an app's helper windows (a 30-point
+            // strip at the origin after a display change) can never be restored, and owning one
+            // would keep every restore, and so quitting, from finishing.
             if let Some(home) = disposition
                 .and_then(|patch| patch.home)
                 .filter(|home| !self.is_visible(*home, outputs))
+                .filter(|_| crate::agents::is_agent(window.app.pid))
+                .filter(|_| self.backend.frame(&window).is_ok())
             {
                 self.adopt_parked_unseen(window, home, frame, outputs);
                 continue;
