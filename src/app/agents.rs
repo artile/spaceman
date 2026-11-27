@@ -34,11 +34,13 @@ pub(super) fn explicit(input: &macos::RecentInput) -> bool {
     click || chord || release
 }
 
-/// A second activation of the app focus follow just held back is the user insisting: agents do
-/// not activate their apps (the browser prelude and cua-driver both suppress it).
-const ASK_AGAIN_WINDOW: Duration = Duration::from_secs(10);
+/// A second activation of the app focus follow just held back, after the user's own input, is the
+/// user insisting. An agent can activate its app again (Chrome on a new CDP window) but gives no
+/// input.
+const ASK_AGAIN_WINDOW: f64 = 10.0;
 
-/// Whether `frontmost` activated again, after a hold of the same app within [`ASK_AGAIN_WINDOW`].
+/// Whether `frontmost` activated again, after a hold of the same app within [`ASK_AGAIN_WINDOW`]
+/// and after the user's own input.
 pub(super) fn asked_again(
     input: &macos::RecentInput,
     last_hold: Option<(i32, Instant)>,
@@ -48,12 +50,18 @@ pub(super) fn asked_again(
     let Some((pid, held_at)) = last_hold else {
         return false;
     };
-    let since_hold = now.saturating_duration_since(held_at);
+    let since_hold = now.saturating_duration_since(held_at).as_secs_f64();
+    let input_since_hold = input
+        .key_down
+        .min(input.mouse_down)
+        .min(input.modifiers_changed)
+        < since_hold;
     frontmost == Some(pid)
         && since_hold < ASK_AGAIN_WINDOW
+        && input_since_hold
         && input
             .activated
-            .is_some_and(|activated| activated < since_hold.as_secs_f64())
+            .is_some_and(|activated| activated < since_hold)
 }
 
 impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
@@ -138,33 +146,17 @@ mod tests {
     fn a_new_activation_of_the_held_app_soon_after_follows() {
         let now = Instant::now();
         let held = Some((42, now - Duration::from_secs(3)));
-        // Activated 1 s ago: after the hold 3 s ago.
-        assert!(asked_again(
-            &at(input(9.0, 9.0, 9.0, false), 1.0),
-            held,
-            Some(42),
-            now
-        ));
+        let again = input(1.2, 9.0, 1.2, false);
+        // Command-Tab again 1.2 s ago, Chrome active 1 s ago: after the hold 3 s ago.
+        assert!(asked_again(&at(again, 1.0), held, Some(42), now));
         // The activation the hold answered, still the latest.
-        assert!(!asked_again(
-            &at(input(9.0, 9.0, 9.0, false), 3.1),
-            held,
-            Some(42),
-            now
-        ));
-        assert!(!asked_again(
-            &at(input(9.0, 9.0, 9.0, false), 1.0),
-            held,
-            Some(7),
-            now
-        ));
+        assert!(!asked_again(&at(again, 3.1), held, Some(42), now));
+        assert!(!asked_again(&at(again, 1.0), held, Some(7), now));
         let stale = Some((42, now - Duration::from_secs(30)));
-        assert!(!asked_again(
-            &at(input(9.0, 9.0, 9.0, false), 1.0),
-            stale,
-            Some(42),
-            now
-        ));
+        assert!(!asked_again(&at(again, 1.0), stale, Some(42), now));
+        // Live test: the agent activated Chrome again with no input since the hold.
+        let idle = input(9.0, 9.0, 9.0, false);
+        assert!(!asked_again(&at(idle, 1.0), held, Some(42), now));
     }
 
     #[test]
