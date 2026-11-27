@@ -156,9 +156,20 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
                         .any(|resolved| resolved.workspace == *workspace)
             });
             let recent = agent_hold.and_then(|_| self.backend.recent_input());
-            let agent_hold =
-                agent_hold.filter(|_| !recent.as_ref().is_some_and(super::agents::explicit));
+            let now = self.backend.now();
+            let agent_hold = agent_hold.filter(|_| {
+                !recent.as_ref().is_some_and(|input| {
+                    super::agents::explicit(input)
+                        || super::agents::asked_again(
+                            input,
+                            self.last_agent_hold,
+                            frontmost.as_ref().map(|app| app.pid),
+                            now,
+                        )
+                })
+            });
             if let Some(workspace) = agent_hold {
+                self.last_agent_hold = frontmost.as_ref().map(|app| (app.pid, now));
                 log_event!(
                     "focus follow held: {:?} -> agent workspace {} ({})",
                     focused,

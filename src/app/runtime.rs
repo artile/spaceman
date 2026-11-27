@@ -59,6 +59,8 @@ pub(super) struct WorkspaceRuntime<B = MacWorkspaceBackend> {
     /// Focus intent: a request in flight, focus left behind, and the
     /// cross-display workspace history Option+Tab reads.
     pub(super) focus: super::focus::FocusTracker,
+    /// The agent app whose activation focus follow last held back, and when.
+    pub(super) last_agent_hold: Option<(i32, Instant)>,
     /// The pointer drag or resize being previewed, until mouse-up commits it.
     pub(super) gesture: Option<super::commands::GestureOverlay>,
     pub(super) exact_spacing_workspaces: HashSet<WorkspaceId>,
@@ -358,6 +360,7 @@ impl<B: WorkspaceBackend> WorkspaceRuntime<B> {
             minimum_sizes: HashMap::new(),
             config,
             focus: super::focus::FocusTracker::with_fullscreen_restore(fullscreen_restore),
+            last_agent_hold: None,
             gesture: None,
             exact_spacing_workspaces: WorkspaceId::all().filter(|_| has_spacing).collect(),
             persisted_workspace_state,
